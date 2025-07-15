@@ -91,6 +91,7 @@ dependencies = [
 # end-user of your library, only by you, the developer.
 [project.optional-dependencies]
 dev = [
+    "mypy",         # For type checking
     "ruff",         # The linter and formatter
     "pip-tools",    # For pinning dependencies (we'll cover this next)
     "pre-commit",   # For git hooks (we'll cover this later)
