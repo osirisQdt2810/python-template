@@ -12,6 +12,18 @@
 name: CI/CD pipeline
 
 # =============================================================================
+# GRANT PERMISSION FOR WORKFLOW
+# =============================================================================
+# grant the auto-generated GITHUB_TOKEN the minimum extra scope required
+# missing this leads to too many entries error because:
+# If a workflow file doesn’t declare any permissions: block, the auto-generated GITHUB_TOKEN 
+# defaults to read-only for the contents scope.
+# The release API therefore returns HTTP 403 Forbidden.
+permissions:
+  contents: write    # allow creating / uploading a release
+  packages: read     # keep other scopes at their default
+
+# =============================================================================
 # TRIGGER CONDITIONS
 # =============================================================================
 # When this workflow runs:
@@ -20,6 +32,7 @@ name: CI/CD pipeline
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -29,10 +42,12 @@ on:
 env:
   # Python version matrix for testing
   PYTHON_VERSIONS: "['3.9', '3.10', '3.11']"
+  # Default python version
+  DEFAULT_PYTHON_VERSION: '3.9'
   # Coverage threshold - Build failed if below this score
   COVERAGE_THRESHOLD: 80
   # Package name
-  PACKAGE_NAME: "python-template-project"
+  PACKAGE_NAME: "pyproject-boilerplate"
 
 # =============================================================================
 # PIPELINE JOBS
@@ -59,31 +74,17 @@ jobs:
         # 'uses': specifies that this step will use a built-in action, which could be thought as a pre-built plugin/library
         # 'actions/checkout@v4': action for checking out the repository into that runner so that the workflow can access it.
         uses: actions/checkout@v4
-
-      # Install python interpreter
-      - name: "Setup python 3.9 in runner"
-        uses: actions/setup-python@v4
         # 'with': provides parameters to the action
         with:
-          # specifies the python version which will be installed
-          python-version: "3.9"
-          # enables cache of pip dependencies. This is used for speeding up subsequent workflows by reusing downloaded packages.
-          # the cache mechanism in github:
-          #   - Each repository has a total cache size limit of 10GB in github's central cache storage (github starts evict by using LRU if exceeding that limit)
-          #   - In the very first time when the workflow is triggered (by push/pull-request of the first contributor), github will find the hash of the contents in 
-          #     <cache-dependency-path>(here is `requirements/...`). If not, a.k.a cache-miss, so in the next step (for installing package dependencies) github will 
-          #     download those from the internet and push them to cache storage, tied them with the above hash label.
-          #   - Afterthat, each time the workflow is triggered, the installation in the next step (pip install -r requirements/...) will automatically takes packages
-          #     fetching from the cache instead of internet, speeding up the workflow. 
-          cache: "pip"
+          fetch-depth: 0  # checkout entire repository
 
-      # Install dependencies
-      - name: "Install package dependencies"
-        run:  |
-          python -m pip install --upgrade pip
-          pip install -e '.[dev,test]'
-          pip-compile requirements/dev-requirements.in
-        
+      # Use custom setup python environment
+      - name: "Setup python environment"
+        uses: ./.github/actions/setup-python-env/
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          build-package: false
+
       # Code quality 1: Running ruff lint
       - name: "Lint code (ruff check)"
         run: |
@@ -136,17 +137,11 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
-      - name: "Setup python interpreter (version: ${{ matrix.python-version }})"
-        uses: actions/setup-python@v4
+      - name: "Setup python environment (version: ${{ matrix.python-version }})"
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: "${{ matrix.python-version }}"
-          cache: "pip"
-      
-      - name: "Install dependencies"
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e '.[dev,test]'
-          pip-compile requirements/dev-requirements.in
+          build-package: false
 
       - name: "Run test with coverage"  # If coverage < threshold the step fails and the job stops; Codecov upload is skipped but artifacts are still saved.
         run: |
@@ -181,18 +176,148 @@ jobs:
           retention-days: 30    # how long to store the artifacts in day unit
 
   # # =============================================================================
-  # # JOB 3: BUILD AND INSTALL PACKAGE 
+  # # JOB 3 (OPTIONAL): SECURITY AND VULNERABLE SCANNING
   # # =============================================================================
-  # build:
+  # security:
 
-  # # =============================================================================
-  # # JOB 4: DEPLOYMENT 
-  # # =============================================================================
-  # deploy:
+  # =============================================================================
+  # JOB 4: BUILD AND INSTALL PACKAGE 
+  # =============================================================================
+  build:
+    name: "Builds and installs python package"
+    runs-on: ubuntu-latest
+    needs: [ test ]
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
 
-  # # =============================================================================
-  # # JOB 5: AGGREGATE RESULT AND REPORTING 
-  # # =============================================================================
-  # report:
+      - name: "Build python interpreter (version {{ inputs.python-version }})"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements/dev-requirements.in
 
+      # Use custom setup python environment
+      - name: "Setup python environment"
+        uses: ./.github/actions/setup-python-env/
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          build-package: true
+          
+      # Create distribution packages
+      - name: "Build packages"
+        run: |
+          # clean old build artifacts
+          rm -rf dist/ build/ *.egg-info/
+          # the standard common to build a package
+          python -m build
+          # verifies that the built packages are valid and can be uploaded to PyPI without issues
+          pip install twine
+          twine check dist/*
+          # list the contents to see what was built
+          ls -l dist/
 
+      # Upload build artifacts
+      - name: "Upload distribution as artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+          retention-days: 30
+
+  # =============================================================================
+  # JOB 5: RELEASE AND DEPLOYMENT 
+  # 
+  # This job is only triggered when the workflow is pushing a new tag version v* 
+  # Note that if we deleted the remote tags, the release version is also eliminated as well.
+  # =============================================================================
+  deploy:
+    name: "Package release and deployment "
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    # The gatekeeper for deployment. The job will only run if:
+    # 1. The event triggered is 'push'
+    # 2. The git reference ('ref') that was pushed starts with 'refs/tags/v' (a tag version)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    environment:
+      name: production
+      # The URL will be displayed on the workflow run page.
+      url: https://pypi.org/project/${{ env.PACKAGE_NAME }}
+
+    steps:
+      - name: "Download build artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package  # just same as uploading
+          path: dist/
+      
+      # softprops/action-gh-release calls the API endpoint POST /repos/{owner}/{repo}/releases.
+      # That endpoint requires the “contents: write” scope.
+      - name: "Create a Github release"
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          # Tell GitHub to auto-fill the release body with a changelog (merged PRs, commits, contributors) instead of writing it manually.
+          generate_release_notes: true
+
+      - name: "Deploy to Pypi registry"
+        if: always()
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # The password for PyPI should be stored as a secret in your GitHub repository settings.
+          # '${{ secrets.VARIABLE_NAME }}' is the secure way to access secrets.
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          # You can uncomment the next line to deploy to the Test PyPI registry first.
+          # Note that comment the next line will make step failed in this context project
+          # because another project with the same name already exists. And because this is
+          # another service used for testing pypi, so you also need to create a token for this service,
+          # naming it as TEST_PYPI_API_TOKEN and replacing the password field above.
+          # repository_url: https://test.pypi.org/legacy/
+
+  # ===========================================================================
+  # JOB 6: NOTIFICATION AND REPORTING
+  # ===========================================================================
+  report:
+    name: "📊 Generate Pipeline Report"
+    runs-on: ubuntu-latest
+    # This job needs the results from all previous major jobs.
+    needs: [code-quality, test, build]
+    # 'if: always()': This job should run regardless of whether the other jobs
+    # succeeded or failed, so it can report on the final status.
+    if: always()
+    
+    steps:
+    - name: "📥 Checkout Repository"
+      uses: actions/checkout@v4
+    
+    - name: "📊 Pipeline Summary"
+      run: |
+        # '$GITHUB_STEP_SUMMARY' is a special file. Anything written to it will
+        # appear as a formatted summary on the GitHub Actions workflow run page.
+        echo "## 🏗️ CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        # '${{ needs.job_name.result }}' is how you access the final status
+        # (e.g., 'success', 'failure', 'cancelled') of a job this one 'needs'.
+        echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Key Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage Threshold**: ${{ env.COVERAGE_THRESHOLD }}%" >> $GITHUB_STEP_SUMMARY
+        echo "- **Python Versions Tested**: ${{ env.PYTHON_VERSIONS }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Conditionally add more details to the summary if a job failed.
+        if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+          echo "❌ **Code Quality Issues**: Check linting, formatting, or type errors" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "❌ **Test Failures**: Check test results or coverage below threshold" >> $GITHUB_STEP_SUMMARY
+        fi

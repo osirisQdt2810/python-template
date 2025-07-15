@@ -1,0 +1,48 @@
+name: "Setup environment"
+description: "Setup python environment and package dependencies"
+inputs:   # using 'with' in workflow to pass the input arguments
+  python-version: 
+    description: "Python version to use"
+    require: false
+    default: '3.9'
+  build-package: 
+    description: "Flag to control this action uses for building package or not"
+    required: false
+    default: false
+
+runs:
+  using: 'composite'  # it is crucial to define this is a composite action
+  steps:
+    # Install python interpreter
+    - name: "Build python interpreter (version {{ inputs.python-version }})"
+      uses: actions/setup-python@v4
+      with:
+        # specifies the python version which will be installed
+        python-version: ${{ inputs.python-version }}
+          # enables cache of pip dependencies. This is used for speeding up subsequent workflows by reusing downloaded packages.
+          # the cache mechanism in github:
+          #   - Each repository has a total cache size limit of 10GB in github's central cache storage (github starts evict by using LRU if exceeding that limit)
+          #   - In the very first time when the workflow is triggered (by push/pull-request of the first contributor), github will find the hash of the contents in 
+          #     <cache-dependency-path>(here is `requirements/...`). If not, a.k.a cache-miss, so in the next step (for installing package dependencies) github will 
+          #     download those from the internet and push them to cache storage, tied them with the above hash label.
+          #   - Afterthat, each time the workflow is triggered, the installation in the next step (pip install -r requirements/...) will automatically takes packages
+          #     fetching from the cache instead of internet, speeding up the workflow.        
+        cache: 'pip'
+        cache-dependency-path: requirements/dev-requirements.in
+
+    # Install dependencies
+    - name: "Install package dependencies (not in build job)"
+      if: inputs.build-package == 'false'
+      shell: bash   # it is required in the composite action 
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools
+        pip-compile --extra=dev --extra=test --output-file=requirements/dev-requirements.txt pyproject.toml
+        pip install -r requirements/dev-requirements.txt
+
+    - name: "Install package dependencies (in build job)"
+      if: inputs.build-package == 'true'  # composite-action inputs are always strings
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
