@@ -30,6 +30,8 @@ on:
 env:
   # Python version matrix for testing
   PYTHON_VERSIONS: "['3.9', '3.10', '3.11']"
+  # Default python version
+  DEFAULT_PYTHON_VERSION: '3.9'
   # Coverage threshold - Build failed if below this score
   COVERAGE_THRESHOLD: 80
   # Package name
@@ -68,7 +70,8 @@ jobs:
       - name: "Setup python environment"
         uses: ./.github/actions/setup-python-env/
         with:
-          python-version: '3.9'
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          build-package: false
 
       # Code quality 1: Running ruff lint
       - name: "Lint code (ruff check)"
@@ -126,6 +129,7 @@ jobs:
         uses: ./.github/actions/setup-python-env
         with:
           python-version: "${{ matrix.python-version }}"
+          build-package: false
 
       - name: "Run test with coverage"  # If coverage < threshold the step fails and the job stops; Codecov upload is skipped but artifacts are still saved.
         run: |
@@ -164,16 +168,51 @@ jobs:
   # # =============================================================================
   # security:
 
-  # # =============================================================================
-  # # JOB 4: BUILD AND INSTALL PACKAGE 
-  # # =============================================================================
-  # build:
-  #   name: "Builds and installs python package"
-  #   runs-on: ubuntu-latest
-  #   needs: [ test ]
-  #   steps:
-      
+  # =============================================================================
+  # JOB 4: BUILD AND INSTALL PACKAGE 
+  # =============================================================================
+  build:
+    name: "Builds and installs python package"
+    runs-on: ubuntu-latest
+    needs: [ test ]
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
 
+      - name: "Build python interpreter (version {{ inputs.python-version }})"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements/dev-requirements.in
+
+      # Use custom setup python environment
+      - name: "Setup python environment"
+        uses: ./.github/actions/setup-python-env/
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON_VERSION }}
+          build-package: true
+          
+      # Create distribution packages
+      - name: "Build packages"
+        run: |
+          # clean old build artifacts
+          rm -rf dist/ build/ *.egg-info/
+          # the standard common to build a package
+          python -m build
+          # verifies that the built packages are valid and can be uploaded to PyPI without issues
+          pip install twine
+          twine check dist/*
+          # list the contents to see what was built
+          ls -l dist/
+
+      # Upload build artifacts
+      - name: "Upload distribution as artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+          retention-days: 30
 
   # # =============================================================================
   # # JOB 5: RELEASE AND DEPLOYMENT 
