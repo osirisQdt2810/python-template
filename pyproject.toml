@@ -27,10 +27,10 @@ build-backend = "setuptools.build_meta"
 # ===================================================================
 [project]
 # The name of your package as it will appear on PyPI.
-name = "python-template-project"
+name = "pyproject-boilerplate"
 
 # The current version of your project. Follows semantic versioning.
-version = "0.1.0"
+version = "0.1.1"
 
 # A short, one-sentence description of your project.
 description = "A professional Python project template built step-by-step."
@@ -93,7 +93,6 @@ dependencies = [
 dev = [
     "mypy",         # For type checking
     "ruff",         # The linter and formatter
-    "pip-tools",    # For pinning dependencies (we'll cover this next)
     "pre-commit",   # For git hooks (we'll cover this later)
     "docformatter", # For checking docstring
 ]
