@@ -1,0 +1,198 @@
+# =============================================================================
+# COMPREHENSIVE CI/CD PIPELINE FOR PYTHON TEMPLATE PROJECT
+# =============================================================================
+# This workflow demonstrates professional CI/CD practices including:
+# - Code quality checks (linting, formatting, type checking)
+# - Multi-environment testing (Python 3.9, 3.10, 3.11)
+# - Comprehensive testing with coverage analysis
+# - Package building
+# - Automated deployment with quality gates
+# - Notification and reporting
+# =============================================================================
+name: CI/CD pipeline
+
+# =============================================================================
+# TRIGGER CONDITIONS
+# =============================================================================
+# When this workflow runs:
+#   - On every push to main and develop branches (CI for production-ready code)
+#   - On every pull request (CI for proposed changes)
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# =============================================================================
+# GLOBAL ENVIRONMENT
+# =============================================================================
+env:
+  # Python version matrix for testing
+  PYTHON_VERSIONS: "['3.9', '3.10', '3.11']"
+  # Coverage threshold - Build failed if below this score
+  COVERAGE_THRESHOLD: 80
+  # Package name
+  PACKAGE_NAME: "python-template-project"
+
+# =============================================================================
+# PIPELINE JOBS
+#
+# A job is a self-contained unit of work that runs on a runner (VM or container)
+# Jobs as parallel states in our pipeline, each has its own environment, contains
+# a sequence of steps.
+# =============================================================================
+jobs:
+  # =============================================================================
+  # JOB 1: CODE QUALITY CHECKS
+  # =============================================================================
+  code-quality:
+    # Name displayed for the job in github UI
+    name: "🔍 Code Quality Checks"
+    # Specify the type of virtual machine (runner) (or we can describe it as an image) to run the job 
+    runs-on: ubuntu-latest
+    # A job contains a sequence of steps running on that order. A step may be a built-in
+    # github action, or a run of commands. By default, if a step failed, the following steps
+    # won't be skipped.
+    steps:
+      # Check out repository
+      - name: "Checkout repository"
+        # 'uses': specifies that this step will use a built-in action, which could be thought as a pre-built plugin/library
+        # 'actions/checkout@v4': action for checking out the repository into that runner so that the workflow can access it.
+        uses: actions/checkout@v4
+
+      # Install python interpreter
+      - name: "Setup python 3.9 in runner"
+        uses: actions/setup-python@v4
+        # 'with': provides parameters to the action
+        with:
+          # specifies the python version which will be installed
+          python-version: "3.9"
+          # enables cache of pip dependencies. This is used for speeding up subsequent workflows by reusing downloaded packages.
+          # the cache mechanism in github:
+          #   - Each repository has a total cache size limit of 10GB in github's central cache storage (github starts evict by using LRU if exceeding that limit)
+          #   - In the very first time when the workflow is triggered (by push/pull-request of the first contributor), github will find the hash of the contents in 
+          #     <cache-dependency-path>(here is `requirements/...`). If not, a.k.a cache-miss, so in the next step (for installing package dependencies) github will 
+          #     download those from the internet and push them to cache storage, tied them with the above hash label.
+          #   - Afterthat, each time the workflow is triggered, the installation in the next step (pip install -r requirements/...) will automatically takes packages
+          #     fetching from the cache instead of internet, speeding up the workflow. 
+          cache: "pip"
+
+      # Install dependencies
+      - name: "Install package dependencies"
+        run:  |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev,test]'
+          pip-compile requirements/dev-requirements.in
+        
+      # Code quality 1: Running ruff lint
+      - name: "Lint code (ruff check)"
+        run: |
+          # --output-format=github: makes ruff produce annotation directly on the pull-request files in github UI.
+          ruff check --output-format=github .
+      
+      # # Code quality 2: Running ruff format
+      # - name: "Format code (ruff format)"
+      #   run: |
+      #     ruff format --check --diff .
+
+      # Code quality 3: Running type check
+      - name: "Type checking (mypy)"
+        run: |
+          mypy src/ --strict --install-types --non-interactive --ignore-missing-imports --show-error-context
+
+      # Code quality 4: Running docstrings
+      - name: "Check docstrings"
+        run: |
+          docformatter src/ --recursive
+
+  # =============================================================================
+  # JOB 2: TEST WITH COMPREHENSIVE MATRIX 
+  # =============================================================================
+  test:
+    # A way to define a matrix of variations/jobs. Through this 'strategy', github will setup the 'test' job
+    # will run on a list of combinations (matrix), each run in separate, parallel and independent virtual machines (runners)
+    # PURPOSE: test your code against a wide range of environments automatically.
+    strategy:
+      # 'fail-fast=false': If one matrix job is failed, github will not cancel the other running jobs.
+      # This is essential to see all failure across all the different runtime environment.
+      fail-fast: false
+      # 'matrix': defines the different configurations to run this job
+      matrix:
+        # Based on the definitions below, there will be 3x3=9 jobs run in parallel
+        # Job(i, j) will run in os (j) with python version (i)
+        python-version: ["3.9", "3.10", "3.11"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # 'include': allows to add extra specific combination
+        include:
+          - python-version: "3.12"
+            os: ubuntu-latest
+            experimental: true    # a key-value pair, simply as a global environmental variables which we can access through ${{ matrix.experimental }} 
+
+    name: "Test suite (Python: ${{ matrix.python-version }}, OS: ${{ matrix.os }})"
+    runs-on: "${{ matrix.os }}"
+    # a job dependency specifies that job 'test' only starts when 'code-quality' is successfully completed.
+    needs: code-quality
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup python interpreter (version: ${{ matrix.python-version }})"
+        uses: actions/setup-python@v4
+        with:
+          python-version: "${{ matrix.python-version }}"
+          cache: "pip"
+      
+      - name: "Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev,test]'
+          pip-compile requirements/dev-requirements.in
+
+      - name: "Run test with coverage"  # If coverage < threshold the step fails and the job stops; Codecov upload is skipped but artifacts are still saved.
+        run: |
+          pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} --verbose tests/
+
+      - name: "Upload coverage reports to codecov for analysis"
+        # 'if': makes the step conditional, which means it will only run if the statement is true.
+        # Here, we only upload coverage reports from one specific job to avoid duplication.
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'   # avoid using "3.11" because of error: Unexpected symbol "3"
+        # 'codecov-action': uis an action for uploading coverage reports to Codecov.io
+        # codecov: a hosted services for collecting, parsing and visualizing code coverage metrics
+        # we can get a dynamic badges by using: ![Coverage](https://codecov.io/gh/your-org/your-repo/branch/main/graph/badge.svg).
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # <--- Add this line
+          file: ./coverage.xml      # path to the coverage report file
+          flags: unittests          # flag to categorize coverage reports in Codecov UI
+          name: python-template-project-coverage  # label name assigned to a specific report upload (we can have multiple codecov upload, for example integration test, frontend test...)
+          fail_ci_if_error: false   # dont fail CI job if the Codecov upload fail
+
+      - name: "Upload test results and coverage reports as artifacts for other jobs seeing"
+        # this ensures the step still runs eventhough previous steps in the job are failed.
+        if: always()
+        # 'upload-artifact': is an action that store files from your current job run.
+        # These files can be downloaded later from other jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}-${{ matrix.os }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30    # how long to store the artifacts in day unit
+
+  # # =============================================================================
+  # # JOB 3: BUILD AND INSTALL PACKAGE 
+  # # =============================================================================
+  # build:
+
+  # # =============================================================================
+  # # JOB 4: DEPLOYMENT 
+  # # =============================================================================
+  # deploy:
+
+  # # =============================================================================
+  # # JOB 5: AGGREGATE RESULT AND REPORTING 
+  # # =============================================================================
+  # report:
+
+
