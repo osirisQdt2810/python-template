@@ -161,6 +161,7 @@ jobs:
         # we can get a dynamic badges by using: ![Coverage](https://codecov.io/gh/your-org/your-repo/branch/main/graph/badge.svg).
         uses: codecov/codecov-action@v3
         with:
+          token: ${{ secrets.CODECOV_TOKEN }} # <--- Add this line
           file: ./coverage.xml      # path to the coverage report file
           flags: unittests          # flag to categorize coverage reports in Codecov UI
           name: python-template-project-coverage  # label name assigned to a specific report upload (we can have multiple codecov upload, for example integration test, frontend test...)
