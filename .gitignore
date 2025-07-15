@@ -1,0 +1,14 @@
+.ruff-cache/
+.mypy_cache/
+.cache/
+.pytest_cache/
+.cache/
+__pycache__/
+
+build/
+dist/
+
+*.egg-info
+
+CSHT-Final-Project/
+ci.yml

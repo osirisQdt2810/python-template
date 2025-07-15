@@ -1,0 +1,305 @@
+# .pre-commit-config.yaml
+#
+# ===================================================================
+# PRE-COMMIT HOOKS CONFIGURATION
+#
+# This file configures pre-commit hooks that will run automatically
+# before each commit. Pre-commit helps catch issues early in the
+# development process by running checks on your code before it gets
+# committed to version control.
+#
+# WHAT IS PRE-COMMIT?
+# Pre-commit is a framework for managing and maintaining multi-language
+# pre-commit hooks. It helps you:
+# - Catch bugs and issues before they reach your repository
+# - Ensure consistent code style across your team
+# - Run automated tests and linting
+# - Validate file formats and structures
+# - Prevent common mistakes (like committing large files or secrets)
+#
+# WHEN TO USE PRE-COMMIT?
+# - In any project where code quality and consistency matter
+# - When working in a team to ensure everyone follows the same standards
+# - To catch issues early in development before they become problems
+# - To automate repetitive code quality checks
+#
+# HOW IT WORKS:
+# 1. Pre-commit installs git hooks in your repository
+# 2. When you run 'git commit', the hooks run automatically
+# 3. If any hook fails, the commit is rejected
+# 4. You fix the issues and try committing again
+# Note. 1. The pre-commit hooks will run in the underlying steps:
+#   s1: Check 'language' environment, if it is 'python', then it will run on virtual environment, if it is 'system', then it will run on the system environment (bash, zsh...)
+#   s2: Check 'types' of the files, if it is 'python', then it will run on python files, if it is 'text', then it will run on text files, if it is 'yaml', then it will run on yaml files, etc.
+#   s3: Check 'exclude' of the files, if it is '.git', then it will exclude the .git directory from the check
+#   s4: Check 'args' of the files, if it is '--arg1,--arg2', then it will pass the arguments to the hook
+#   s5: Check 'stages' of the files, if it is 'commit', then it will run on the commit stage, if it is 'push', then it will run on the push stage, etc.
+#   s6: Check 'verbose' of the files, if it is 'true', then it will enable verbose output
+#   s7: Check .....
+#   s8: Run the hook with the following command on all staged files:
+#         <entry> <arg1> <arg2> .... <file1> <file2> .... <verbose> <...>
+# Note. 2. Pre-commit determines a hook is failed if and only if the exit code of the entry command returns non-zero
+# ===================================================================
+# CONFIGURATION NOTES AND BEST PRACTICES
+# 
+# 1. HOOK ORDERING: Hooks run in the order they're defined. Put
+#    formatters before linters to avoid conflicts.
+# 
+# 2. PERFORMANCE: Some hooks can be slow. Consider running expensive
+#    checks only on push rather than every commit.
+# 
+# 3. TEAM ADOPTION: Start with basic hooks and gradually add more
+#    advanced ones as your team gets comfortable.
+# 
+# 4. CONFIGURATION: Most hooks can be configured via args or by
+#    creating tool-specific config files.
+# 
+# 5. EXCLUSIONS: Use exclude patterns to skip files that shouldn't
+#    be checked (e.g., generated code, third-party files).
+# 
+# 6. DEBUGGING: Use 'pre-commit run --all-files' to test all hooks
+#    on your entire codebase.
+# 
+# 7. UPDATES: Regularly update hook versions using 'pre-commit
+#    autoupdate' to get bug fixes and new features.
+# ===================================================================
+
+# Minimum version of pre-commit required
+minimum_pre_commit_version: '3.0.0'
+
+# The default language version to use for hooks
+default_language_version:
+  python: python3.9
+
+
+# Configuration for individual hook repositories
+repos:
+  # ===================================================================
+  # BUILT-IN HOOKS - General File and Git Checks
+  # 
+  # These hooks are maintained by the pre-commit project itself and
+  # cover common, language-agnostic checks that are useful for most
+  # projects.
+  # ===================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      #######################
+      # FILE CONTENT CHECKS #
+      #######################
+      
+      # Removes trailing whitespace from lines
+      # WHY: Trailing whitespace can cause issues with version control
+      # WHEN: Always - it's a good practice for all text files
+      - id: trailing-whitespace                     # unique identifier for the hook
+        name: "Remove trailing whitespace"          # human-readable name for the hook
+        description: "Remove trailing whitespace from lines" # description for the hook
+        types: [python]                             # the file types to run the hook on, including python, text, yaml, json, markdown...
+        exclude: .git                               # define list of files or directory that will be excluded to the check
+        language: python                            # specify the language environment that pre-commit should setup to run the hook, including python, system, etc.
+        # entry: "python -m my_package.cli"         # define the actual command to run the hook (commonly used for local hooks)
+        # args: [--arg1,--arg2]                     # additional arguments to pass to the hook
+        # stages: [commit,push]                     # define the stages to run the hook on, including commit, push, manual, commit-msg, etc.
+        # verbose: true                             # enable verbose output
+        
+      # Checks for files that are too large
+      # WHY: Large files can slow down git operations and shouldn't be in version control
+      # WHEN: Always - helps prevent accidentally committing large files
+      - id: check-added-large-files
+        name: "Check for large files"
+        description: "Check for files that are too large"
+        args: ["--maxkb=10000"]      # Limit to 10MB
+
+      #######################
+      # GIT SPECIFIC CHECKS #
+      #######################
+      # Check for files that are merge conflict markers
+      # WHY: To prevent committing unresolved merge conflicts
+      # WHEN: Always - critical for team collaboration
+      - id: check-merge-conflict
+        name: "Check for merge conflicts"
+        description: "Check for files that are merge conflict markers"
+
+      ##########################
+      # FILE FORMAT VALIDATION #
+      ##########################
+      # Checks whether files parse as valid JSON
+      # WHY: Invalid Json can break applications and tools
+      # WHEN: For any project that uses JSON
+      - id: check-json
+        name: "Check JSON"
+        description: "Check whether files parse as valid JSON"
+
+      # Checks whether files parse as valid YAML
+      # WHY: Invalid YAML can break CI/CD pipelines and configurations
+      # WHEN: For any project that uses YAML
+      - id: check-yaml
+        name: "Check YAML"
+        description: "Check whether files parse as valid YAML"
+
+      # Checks whether files parse as valid TOML
+      # WHY: Invalid TOML can break applications and configurations
+      # WHEN: For any project that uses TOML
+      - id: check-toml
+        name: "Check TOML"
+        description: "Check whether files parse as valid TOML"
+
+      ###################
+      # SECURITY CHECKS #
+      ###################
+      # Check if private keys detected in your files
+      # WHY: Prevents accidentally or deliberately exposing private keys
+      # WHEN: Always - security is important
+      - id: detect-private-key
+        name: "Check for private keys"
+        description: "Detect private keys in your files"
+
+  # ===================================================================
+  # PYTHON LINTING AND FORMATTING - RUFF
+  # 
+  # Ruff is an extremely fast Python linter and formatter, written in Rust.
+  # It replaces black, isort, flake8, and more, consolidating our toolchain.
+  # Configuration for ruff is managed in the [tool.ruff] section of pyproject.toml.
+  # 
+  # IMPORTANT: When using --fix, the linter (ruff-check) must run BEFORE 
+  # the formatter (ruff-format) because linting fixes can introduce new 
+  # formatting issues that need to be cleaned up by the formatter.
+  # ===================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.3
+    hooks:
+      # Ruff linter - checks for code quality issues (RUNS FIRST)
+      - id: ruff-check
+        name: "Lint Python Code (Ruff)"
+        description: "Lints Python code using Ruff"
+        args: [
+          # "--fix",                    # Auto-fix linting issues
+          # "--exit-non-zero-on-fix",   # Exit with non-zero code if fixes were applied
+          # "--verbose"                 # See the detailed output 
+        ] 
+        types_or: [python, pyi]
+        files: ^(src|tests)/
+
+      # Ruff formatter - formats code (RUNS SECOND, after linting)
+      - id: ruff-format
+        name: "Format Python Code (Ruff)"
+        description: "Formats Python code using the Ruff formatter" 
+        args: [
+          "--check",                    # Check mode: report files that would be reformatted
+          "--diff"                      # flag to show the differences
+          # Note: --verbose is not supported by ruff format
+        ]
+        types_or: [python, pyi]
+        files: ^(src|tests)/
+
+
+  # ===================================================================
+  # PYTHON IMPORT SORTING - REMOVED
+  #
+  # The standalone 'isort' hook has been removed because import
+  # sorting is now handled by the 'ruff' hook, which is configured
+  # in pyproject.toml to enforce 'isort' rules (rule code "I").
+  # This improves performance and consolidates configuration.
+  # ===================================================================
+
+  # ===================================================================
+  # PYTHON DOCSTRING FORMATTING - DOCFORMATTER
+  # 
+  # docformatter formats docstrings to follow PEP 257 conventions.
+  # It helps maintain consistent docstring style across your project.
+  # ===================================================================
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.7
+    hooks:
+      - id: docformatter
+        name: "Format Python Docstrings"
+        description: "Formats Python docstrings to follow PEP 257"
+        files: ^src/
+        args: [
+          # "--in-place",               # actually rewrite files (omit if wanna see the actual errors and suggested fixes, or use --check in CI)
+          "--check",
+          "--diff",
+          "--config=pyproject.toml"
+        ]
+        additional_dependencies: ["tomli"]  # this allows docformatter to read [tool.docformatter] section in pyproject.toml
+        types: [python]
+
+  # ===================================================================
+  # PYTHON TYPE CHECKING - MYPY
+  # 
+  # mypy is a static type checker for Python. Most configuration is
+  # now handled in pyproject.toml under [tool.mypy]. Only frequently
+  # changed arguments are kept here for easy adjustment.
+  # ===================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0  # Use a more recent stable version
+    hooks:
+      - id: mypy
+        name: "Type Check Python Code (MyPy)"
+        description: "Performs static type checking on Python code"
+        # Additional dependencies mypy needs to understand your code
+        additional_dependencies: [
+          'types-requests',     # Type stubs for requests library
+          'types-PyYAML',       # Type stubs for PyYAML library
+          'types-setuptools'    # Type stubs for setuptools library
+        ]
+        # Only keep frequently-changed arguments here
+        args: [
+          "--ignore-missing-imports", # Don't require type stubs for third-party libraries
+          "--strict",                 # Enable all strict flags (uncomment for strictest checking), see detailed in pyproject.toml
+          "--show-error-context",     # show error context (the lines around the error)
+          "--install-types",          # allows mypy to install missing type stubs for 3rd party libs
+          "--non-interactive"         # ensures it doesn't prompt for input
+        ]
+        types: [python]
+        files: ^src/
+        exclude: |
+          (?x)^(
+              migrations/|
+              build/|
+              dist/
+          )
+
+  # ===================================================================
+  # PYTHON TESTING - PYTEST
+  # 
+  # Runs your test suite before commits to ensure all tests pass.
+  # This is optional but recommended for critical projects.
+  # ===================================================================
+  - repo: local
+    hooks:
+      - id: pytest
+        name: "Run Python Tests"
+        description: "Runs the test suite using pytest"
+        entry: pytest
+        language: system
+        types: [python]
+        # Only run if test files have changed
+        files: ^tests/.*\.py$
+        # Run tests in the background (optional)
+        # pass_filenames: false
+        # always_run: true     
+
+  # ===================================================================
+  # CUSTOM LOCAL HOOKS
+  # 
+  # You can define custom hooks that run local scripts or commands
+  # specific to your project.
+  # ===================================================================
+  - repo: local
+    hooks:
+      # Example: Check for TODO comments in production code
+      - id: check-todos
+        name: "Check for TODO Comments"
+        description: "Warns about TODO comments in production code"
+        entry: bash
+        args:
+          - -c
+          - | # YAML syntax allows us to write a readable multi-line bash script
+            if grep -r "TODO\|FIXME\|XXX" src/ --include="*.py"; then
+              echo "Warning: TODO/FIXME/XXX comments found in source code"
+              exit 1
+            fi
+        language: system
+        types: [python]
+        pass_filenames: false

@@ -1,0 +1,268 @@
+# pyproject.toml
+
+# ===================================================================
+# PART 1: Build System Configuration (PEP 518)
+#
+# This is the most fundamental part. It tells tools like `pip` HOW
+# to build your project. Before `pip` can install your package, it
+# first needs to know what tools are required to build it.
+# ===================================================================
+[build-system]
+# These are the build-time dependencies.
+# We are telling pip: "To build this project, you first need to have
+# 'setuptools' version 61.0 or newer installed."
+requires = ["setuptools>=61.0"]
+
+# This specifies the Python object that will be used to execute the build process.
+# We're using the standard build backend from `setuptools`.
+build-backend = "setuptools.build_meta"
+
+
+# ===================================================================
+# PART 2: Project Metadata (PEP 621)
+#
+# This section describes your project. It's the information that will
+# be displayed on the Python Package Index (PyPI) if you publish it.
+# It replaces the need for most of a `setup.py` or `setup.cfg` file.
+# ===================================================================
+[project]
+# The name of your package as it will appear on PyPI.
+name = "python-template-project"
+
+# The current version of your project. Follows semantic versioning.
+version = "0.1.0"
+
+# A short, one-sentence description of your project.
+description = "A professional Python project template built step-by-step."
+
+# The filename of the long description file (your README).
+# The content of this file will be shown on the PyPI project page.
+readme = "README.md"
+
+# The version of Python your project supports.
+# The syntax ">=3.8" is a version specifier.
+requires-python = ">=3.8"
+
+# A list of classifiers to help users find your project on PyPI.
+# You can find the full list of classifiers on pypi.org.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# The authors of the project.
+authors = [
+    { name="phucnp2", email="phuc.nguyen@moreh.com.vn" },
+]
+
+# The maintainers of the project.
+maintainers = [
+    { name="phucnp2", email="phuc.nguyen@moreh.com.vn" },
+]
+
+# ===================================================================
+# PART 3: Dependencies
+#
+# This is where you declare your project's dependencies.
+# ===================================================================
+
+# Runtime dependencies: These are the packages that your project
+# needs to run. They will be automatically installed by pip when
+# someone installs your package. We have none for now.
+# Example: dependencies = ["requests", "httpx==0.23.0"]
+dependencies = [
+    "typer",      # an easy-to-use CLI parser based on Python type hints
+]
+
+# [Advanced] Optional Dependencies: These are dependencies needed for
+# extra features. Users can install them by specifying the feature name
+# in brackets, e.g., `pip install '.[dev]'`.
+#
+# We define a 'dev' group for all tools needed for development:
+# linting, formatting, testing, etc. These are not needed by the
+# end-user of your library, only by you, the developer.
+[project.optional-dependencies]
+dev = [
+    "ruff",         # The linter and formatter
+    "pip-tools",    # For pinning dependencies (we'll cover this next)
+    "pre-commit",   # For git hooks (we'll cover this later)
+    "docformatter", # For checking docstring
+]
+test = [
+    "pytest",     # The testing framework
+    "pytest-cov", # The pytest plugin for measuring code coverage
+]
+
+# This table defines command-line scripts that should be created when the package is installed.
+# This is how you create command-line tools with your package.
+[project.scripts]
+cli-tool = "my_package.cli:run"
+
+# ===================================================================
+# PART 4: Tool configuration
+#
+# This section configures various development tools.
+# By placing them here, we can easily manage them in one file.
+# ===================================================================
+# Configuration specific to 'setuptools' build tool.
+[tool.setuptools.packages.find]
+# This tells setuptools to look for Python packages inside the 'src' directory.
+# This is a modern practice 'src-layout' that separates source code from the rest of the project (like test, docs, etc).
+where = ["src"]
+
+# Configuration specific to 'ruff' linter and formatter.
+[tool.ruff]
+# Set the maximum line length for both the linter and formatter for consistency.
+line-length = 120
+
+# A list of file patterns to exclude from linting and formatting.
+exclude = [
+    ".git",
+    ".cursor",
+    ".vscode",
+    "deploy",
+    "build",
+    "dist"
+]
+
+# This section now contains ALL lint-specific configurations.
+[tool.ruff.lint]
+# A list of rule codes to enable. For a full list, see https://docs.astral.sh/ruff/rules/
+select = [
+    "E",  # pycodestyle errors (e.g., indentation errors, whitespace issues)
+    "W",  # pycodestyle warnings (e.g., line too long)
+    "F",  # Pyflakes (for detecting unused imports, undefined names, etc.)
+    "I",  # isort (ruff can also handle import sorting, making 'isort' package optional)
+    "UP", # pyupgrade (for automatically upgrading syntax to newer Python versions)
+    "B",  # flake8-bugbear (finds possible bugs and design problems)
+    "C4", # flake8-comprehensions (helps write more idiomatic comprehensions)
+    "A",  # flake8-builtins (checks for shadowing of Python built-ins)
+]
+# A list of specific rules to ignore globally across the project.\
+# https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+ignore = [
+    "W191", # disable the check for missing newline at the end of file.
+    "E111", # Checks for indentation with a non-multiple of 4 spaces.
+    "E114", # Checks for indentation of comments with a non-multiple of 4 spaces.
+    "E117", # Checks for over-indented code.
+    "D206", # Checks for docstrings that are indented with tabs.
+    "D300", # Checks for docstrings that use '''triple single quotes''' instead of """triple double quotes""".
+    "Q000", # Checks for inline strings that use single quotes or double quotes, depending on the value of the lint.flake8-quotes.inline-quotes option.
+    "Q001", # Checks for multiline strings that use single quotes or double quotes, depending on the value of the lint.flake8-quotes.multiline-quotes setting.
+    "Q002", # Checks for docstrings that use single quotes or double quotes, depending on the value of the lint.flake8-quotes.docstring-quotes setting.
+    "Q003", # Checks for strings that include escaped quotes, and suggests changing the quote style to avoid the need to escape them.
+    "COM812", # Checks for the absence of trailing commas.
+    "COM819", # Checks for the presence of prohibited trailing commas.
+]
+
+# Configuration specific to ruff's isort integration.
+[tool.ruff.lint.isort]
+# When enabled, multi-line imports are forced to be on a single line if they fit.
+force-single-line = true
+
+# A feature to ignore specific rules for certain files.
+[tool.ruff.lint.per-file-ignores]
+# In '__init__.py' files, it commons to import all the modules in the current package just to make them available at the package level
+# so we ignore "unused import" (F401) error for them.
+"__init__.py" = ["F401"]
+
+# ===================================================================
+# PART 5: DOCFORMATTER CONFIGURATION
+#
+# This section configures the 'docformatter' tool, which is used to
+# format Python docstrings according to PEP 257. By placing the
+# configuration here, we can remove the 'args' from the pre-commit
+# hook, making the setup cleaner.
+# ===================================================================
+[tool.docformatter]
+# Recursively search for files in subdirectories.
+recursive = true
+# Wrap summary lines at 100 characters.
+wrap-summaries = 100
+# Wrap description lines at 100 characters.
+wrap-descriptions = 100
+# Forces one-line summaries to be multi-line.
+make-summary-multi-line = true
+
+# ===================================================================
+# MYPY TYPE CHECKER CONFIGURATION
+# 
+# MyPy is a static type checker for Python. This configuration
+# controls how strict the type checking is and what errors to report.
+# ===================================================================
+[tool.mypy]
+# Show error codes in output (e.g., [arg-type], [return-value])
+# This makes it easier to understand and suppress specific errors
+show_error_codes = true
+# Show column numbers in error messages
+show_column_numbers = true
+# Use color in error messages (when supported by terminal)
+color_output = true
+# Enable strict optional checking
+# This means Optional[T] and T are treated as different types
+strict_optional = true
+# Warn about functions without return type annotations
+warn_return_any = true
+# Warn about untyped function definitions
+warn_no_return = true
+# Warn about unreachable code
+warn_unreachable = true
+# Warn about unused ignores (type: ignore comments that aren't needed)
+warn_unused_ignores = true
+# Warn about redundant casts
+warn_redundant_casts = true
+# ===================================================================
+# STRICTNESS MODES (UNCOMMENT TO ENABLE)
+# 
+# These enable very strict type checking. Start with basic settings
+# above and gradually enable these as your codebase matures.
+# ===================================================================
+# Strict mode enables all optional error checking flags
+# strict = true
+# Individual strict flags (alternative to enabling all with 'strict = true'):
+# disallow_any_generics = true        # Disallow Any in generic types
+# disallow_any_unimported = true      # Disallow Any from unimported modules
+# disallow_untyped_calls = true       # Disallow calling untyped functions
+# disallow_untyped_defs = true        # Disallow untyped function definitions
+# disallow_incomplete_defs = true     # Disallow partially typed function definitions
+# disallow_untyped_decorators = true  # Disallow untyped decorators
+# warn_unused_configs = true          # Warn about unused mypy config options
+allow_untyped_decorators = true
+
+# ===================================================================
+# PYTEST CONFIGURATION
+# ===================================================================
+[tool.pytest.ini_options]
+# Add src directory to Python path for imports
+pythonpath = ["src"]
+# Test discovery settings
+testpaths = ["tests"]
+# pytest output options
+addopts = "-v --tb=short --strict-markers"
+
+# ===================================================================
+# COVERAGE CONFIGURATION
+# ===================================================================
+[tool.coverage.html]
+# Directory for HTML coverage reports
+directory = "htmlcov"
+# Title for HTML coverage reports
+title = "Python Template Project Coverage Report"
+
+[tool.coverage.xml]
+# Filename for XML coverage reports (used by CI/CD)
+output = "coverage.xml"
+
+[tool.coverage.json]
+# Filename for JSON coverage reports
+output = "coverage.json"
+# Pretty-print the JSON output
+pretty_print = true
