@@ -3,13 +3,14 @@ High coverage test suite for the calculator module.
 This file aims to test most of the functionality and edge cases.
 """
 
+from io import StringIO
+import sys
+from unittest.mock import patch
+
 import pytest
 
-from my_package.calculator import Calculator
-from my_package.calculator import add
-from my_package.calculator import divide
-from my_package.calculator import multiply
-from my_package.calculator import subtract
+from my_package import cli
+from my_package.calculator import Calculator, add, divide, multiply, subtract
 
 
 class TestCalculatorBasicOperations:
@@ -283,3 +284,37 @@ class TestEdgeCases:
         assert calc.divide(5, 2) == 2.5
         assert calc.divide(4, 2) == 2.0
         assert calc.divide(1, 3) == 1 / 3
+
+
+class TestCLI:
+    """Test the CLI interface."""
+
+    def test_main_func(self):
+        cli.main()
+
+    def test_add_func(self):
+        assert cli.add(2, 3) == 5
+
+    def test_add_argparse_cli(self):
+        test_args = ["", "--num1", "2", "--num2", "3"]  # argparse automatically uses sys.argv[1:]
+        with patch.object(sys, "argv", test_args):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                result = cli.add_argparse_cli()  # Call the function
+                # Capture the printed output
+                output = mock_stdout.getvalue().strip()
+                # Check if the expected print statement was produced
+                assert output == "The result is 5.0"
+                # Optionally, you can assert the returned result as well
+                assert result == 5.0
+
+    def test_my_function(self):
+        assert cli.my_function(1, 2, 3) == "hello"
+        assert cli.my_function(2, 2, 3) == "world"
+
+    def test_runc_func(self):
+        test_args = ["", "--num1", "2", "--num2", "3"]  # argparse automatically uses sys.argv[1:]
+        with patch.object(sys, "argv", test_args):
+            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+                cli.run()
+                output = mock_stdout.getvalue().strip()
+                assert output == "Run function!!!\nThe result is 5.0"

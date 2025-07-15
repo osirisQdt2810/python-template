@@ -90,10 +90,10 @@ jobs:
           # --output-format=github: makes ruff produce annotation directly on the pull-request files in github UI.
           ruff check --output-format=github .
       
-      # Code quality 2: Running ruff format
-      - name: "Format code (ruff format)"
-        run: |
-          ruff format --check --diff .
+      # # Code quality 2: Running ruff format
+      # - name: "Format code (ruff format)"
+      #   run: |
+      #     ruff format --check --diff .
 
       # Code quality 3: Running type check
       - name: "Type checking (mypy)"

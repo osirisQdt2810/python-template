@@ -167,7 +167,11 @@ ignore = [
 # Configuration specific to ruff's isort integration.
 [tool.ruff.lint.isort]
 # When enabled, multi-line imports are forced to be on a single line if they fit.
-force-single-line = true
+force-single-line = false
+# Combine multiple imports from the same module into a single line
+combine-as-imports = true
+# Force sorting within import sections
+force-sort-within-sections = true
 
 # A feature to ignore specific rules for certain files.
 [tool.ruff.lint.per-file-ignores]

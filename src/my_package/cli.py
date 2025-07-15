@@ -8,7 +8,6 @@ from my_package.new import sub
 # This file contains the logic for our command-line tool.
 app = typer.Typer()
 
-
 def main() -> None:
     """
     The main entry point for the CLI tool.
@@ -17,14 +16,12 @@ def main() -> None:
     print("This is a command-line tool defined in pyproject.toml.")
     sub(1, 1)
 
-
 # A pure, fully-typed helper that can be used safely from both CLI paths.
 def _add_numbers(a: int, b: int) -> int:
     """
     Add two integers and return the result.
     """
     return a + b
-
 
 # mypy complains that Typer's decorator isn't fully typed; ignore that.
 @app.command()
@@ -36,7 +33,6 @@ def add(a: int, b: int) -> int:
     print(f"Adding {a} and {b}: {result}")
     return result
 
-
 # @app.command()
 # def add_typer_cli(
 #     #  signifies that a command-line option or argument is required
@@ -47,7 +43,6 @@ def add(a: int, b: int) -> int:
 #     result = add(num1, num2)
 #     typer.echo(f"The result is {result}")
 #     return result
-
 
 def add_argparse_cli() -> int:
     """
@@ -63,14 +58,10 @@ def add_argparse_cli() -> int:
     print(f"The result is {result}")
     return result
 
-
 def run() -> None:
     # app()
+    print("Run function!!!")
     add_argparse_cli()
-
-
-# ugly_code.py
-
 
 def my_function(a: int, b: Any, c: Any) -> str:
     """
@@ -84,6 +75,5 @@ def my_function(a: int, b: Any, c: Any) -> str:
     else:
         return "world"
 
-
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     run()
