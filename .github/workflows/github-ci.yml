@@ -12,6 +12,18 @@
 name: CI/CD pipeline
 
 # =============================================================================
+# GRANT PERMISSION FOR WORKFLOW
+# =============================================================================
+# grant the auto-generated GITHUB_TOKEN the minimum extra scope required
+# missing this leads to too many entries error because:
+# If a workflow file doesn’t declare any permissions: block, the auto-generated GITHUB_TOKEN 
+# defaults to read-only for the contents scope.
+# The release API therefore returns HTTP 403 Forbidden.
+permissions:
+  contents: write    # allow creating / uploading a release
+  packages: read     # keep other scopes at their default
+
+# =============================================================================
 # TRIGGER CONDITIONS
 # =============================================================================
 # When this workflow runs:
@@ -35,7 +47,7 @@ env:
   # Coverage threshold - Build failed if below this score
   COVERAGE_THRESHOLD: 80
   # Package name
-  PACKAGE_NAME: "python-template-project"
+  PACKAGE_NAME: "pyproject-boilerplate"
 
 # =============================================================================
 # PIPELINE JOBS
@@ -214,14 +226,98 @@ jobs:
           path: dist/
           retention-days: 30
 
-  # # =============================================================================
-  # # JOB 5: RELEASE AND DEPLOYMENT 
-  # # =============================================================================
-  # deploy:
+  # =============================================================================
+  # JOB 5: RELEASE AND DEPLOYMENT 
+  # 
+  # This job is only triggered when the workflow is pushing a new tag version v* 
+  # Note that if we deleted the remote tags, the release version is also eliminated as well.
+  # =============================================================================
+  deploy:
+    name: "Package release and deployment "
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    # The gatekeeper for deployment. The job will only run if:
+    # 1. The event triggered is 'push'
+    # 2. The git reference ('ref') that was pushed starts with 'refs/tags/v' (a tag version)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
-  # # =============================================================================
-  # # JOB 6: AGGREGATE RESULT AND REPORTING 
-  # # =============================================================================
-  # report:
+    environment:
+      name: production
+      # The URL will be displayed on the workflow run page.
+      url: https://pypi.org/project/${{ env.PACKAGE_NAME }}
 
+    steps:
+      - name: "Download build artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package  # just same as uploading
+          path: dist/
+      
+      # softprops/action-gh-release calls the API endpoint POST /repos/{owner}/{repo}/releases.
+      # That endpoint requires the “contents: write” scope.
+      - name: "Create a Github release"
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          # Tell GitHub to auto-fill the release body with a changelog (merged PRs, commits, contributors) instead of writing it manually.
+          generate_release_notes: true
 
+      - name: "Deploy to Pypi registry"
+        if: always()
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # The password for PyPI should be stored as a secret in your GitHub repository settings.
+          # '${{ secrets.VARIABLE_NAME }}' is the secure way to access secrets.
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          # You can uncomment the next line to deploy to the Test PyPI registry first.
+          # Note that comment the next line will make step failed in this context project
+          # because another project with the same name already exists. And because this is
+          # another service used for testing pypi, so you also need to create a token for this service,
+          # naming it as TEST_PYPI_API_TOKEN and replacing the password field above.
+          # repository_url: https://test.pypi.org/legacy/
+
+  # ===========================================================================
+  # JOB 6: NOTIFICATION AND REPORTING
+  # ===========================================================================
+  report:
+    name: "📊 Generate Pipeline Report"
+    runs-on: ubuntu-latest
+    # This job needs the results from all previous major jobs.
+    needs: [code-quality, test, build]
+    # 'if: always()': This job should run regardless of whether the other jobs
+    # succeeded or failed, so it can report on the final status.
+    if: always()
+    
+    steps:
+    - name: "📥 Checkout Repository"
+      uses: actions/checkout@v4
+    
+    - name: "📊 Pipeline Summary"
+      run: |
+        # '$GITHUB_STEP_SUMMARY' is a special file. Anything written to it will
+        # appear as a formatted summary on the GitHub Actions workflow run page.
+        echo "## 🏗️ CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        # '${{ needs.job_name.result }}' is how you access the final status
+        # (e.g., 'success', 'failure', 'cancelled') of a job this one 'needs'.
+        echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Key Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage Threshold**: ${{ env.COVERAGE_THRESHOLD }}%" >> $GITHUB_STEP_SUMMARY
+        echo "- **Python Versions Tested**: ${{ env.PYTHON_VERSIONS }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Conditionally add more details to the summary if a job failed.
+        if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+          echo "❌ **Code Quality Issues**: Check linting, formatting, or type errors" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "❌ **Test Failures**: Check test results or coverage below threshold" >> $GITHUB_STEP_SUMMARY
+        fi
