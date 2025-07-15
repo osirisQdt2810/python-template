@@ -241,7 +241,10 @@ repos:
         additional_dependencies: [
           'types-requests',     # Type stubs for requests library
           'types-PyYAML',       # Type stubs for PyYAML library
-          'types-setuptools'    # Type stubs for setuptools library
+          'types-setuptools',   # Type stubs for setuptools library
+          'typer'               # Add typer dependency for pre-commit environment
+                                # because, Pre-commit creates isolated environments for each hook.
+                                # This isolated environment didn't have access to the typer dependency.
         ]
         # Only keep frequently-changed arguments here
         args: [

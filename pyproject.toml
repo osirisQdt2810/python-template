@@ -236,7 +236,6 @@ warn_redundant_casts = true
 # disallow_incomplete_defs = true     # Disallow partially typed function definitions
 # disallow_untyped_decorators = true  # Disallow untyped decorators
 # warn_unused_configs = true          # Warn about unused mypy config options
-allow_untyped_decorators = true
 
 # ===================================================================
 # PYTEST CONFIGURATION

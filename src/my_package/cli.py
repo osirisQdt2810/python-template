@@ -27,7 +27,7 @@ def _add_numbers(a: int, b: int) -> int:
 
 
 # mypy complains that Typer's decorator isn't fully typed; ignore that.
-@app.command()  # type: ignore[misc]
+@app.command()
 def add(a: int, b: int) -> int:
     """
     Add two integers and echo the result via Typer command.
