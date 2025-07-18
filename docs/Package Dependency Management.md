@@ -95,7 +95,7 @@ For non-build jobs, replace the install steps with:
 ```bash
 python -m pip install --upgrade pip
 pip install pip-tools
-pip-compile --extra=dev --extra=test --output-file=requirements/dev-requirements.txt pyproject.toml
+pip-compile --extra=dev --extra=test --output-file=requirements/dev-requirements.txt pyproject.toml requirements/dev-requirements.in
 pip install -r requirements/dev-requirements.txt
 ```
 * Add `-e .` to the last `pip install` if editable mode is needed.

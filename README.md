@@ -5,7 +5,7 @@
 ```
 To normally run the project, install package dependencies first:
 ```
-    pip install pip-tool
+    pip install pip-tools
 ```
 by compiling `dev-requirements.in` to avoid package installation dependencies:
 ```
@@ -54,4 +54,4 @@ This will create a `/dist` directory, and inside you will dinf your new `.whl` f
   - **Professional goal**: Aim for 80%+ coverage, 90%+ is excellent
   - Use `pytest --cov=src --cov-report=term-missing tests/` to see which specific lines need testing
 - Fifth, CI/CD (Continuous Integration/Continuous Deployment) automates testing, building, and deployment processes to ensure code quality and reliable releases. See [CI/CD workflow documentation](docs/CI-CD%20Workflow.md) for details.
-- Sixth, test coverage rate: ![Coverage](https://codecov.io/gh/osirisQdt2810/python-template/branch/develop/badge.svg)
+- Sixth, test coverage rate: ![Coverage](https://codecov.io/gh/osirisQdt2810/python-template/branch/main/badge.svg)

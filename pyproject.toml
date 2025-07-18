@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 name = "pyproject-boilerplate"
 
 # The current version of your project. Follows semantic versioning.
-version = "0.1.0"
+version = "0.1.1"
 
 # A short, one-sentence description of your project.
 description = "A professional Python project template built step-by-step."
@@ -255,17 +255,11 @@ addopts = "-v --tb=short --strict-markers"
 # COVERAGE CONFIGURATION
 # ===================================================================
 [tool.coverage.html]
-# Directory for HTML coverage reports
-directory = "htmlcov"
 # Title for HTML coverage reports
 title = "Python Template Project Coverage Report"
 
 [tool.coverage.xml]
-# Filename for XML coverage reports (used by CI/CD)
-output = "coverage.xml"
 
 [tool.coverage.json]
-# Filename for JSON coverage reports
-output = "coverage.json"
 # Pretty-print the JSON output
 pretty_print = true
