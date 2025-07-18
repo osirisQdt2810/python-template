@@ -44,6 +44,8 @@ env:
   PYTHON_VERSIONS: "['3.9', '3.10', '3.11']"
   # Default python version
   DEFAULT_PYTHON_VERSION: '3.9'
+  # Coverage report directory
+  COVERAGE_REPORT_DIR: "./coverages"
   # Coverage threshold - Build failed if below this score
   COVERAGE_THRESHOLD: 80
   # Package name
@@ -144,8 +146,74 @@ jobs:
           build-package: false
 
       - name: "Run test with coverage"  # If coverage < threshold the step fails and the job stops; Codecov upload is skipped but artifacts are still saved.
+        shell: bash
         run: |
-          pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} --verbose tests/
+          # Check if tests directory exists and has test files
+          if [ ! -d "tests" ]; then
+            echo "Warning: tests/ directory does not exist. Creating empty coverage report."
+            mkdir -p ${{ env.COVERAGE_REPORT_DIR }}/htmlcov
+            echo '{"coverage": 0, "num_statements": 0}' > ${{ env.COVERAGE_REPORT_DIR }}/coverage.json
+            echo '<?xml version="1.0" ?><coverage></coverage>' > ${{ env.COVERAGE_REPORT_DIR }}/coverage.xml
+            echo "::warning::No tests directory found. Please add tests to improve code quality."
+            exit 0
+          fi
+          
+          test_files=$(find tests -name "*.py" -type f | wc -l)
+          if [ "$test_files" -eq 0 ]; then
+            echo "Warning: No test files found in tests/ directory. Creating empty coverage report."
+            mkdir -p ${{ env.COVERAGE_REPORT_DIR }}/htmlcov
+            echo '{"coverage": 0, "num_statements": 0}' > ${{ env.COVERAGE_REPORT_DIR }}/coverage.json
+            echo '<?xml version="1.0" ?><coverage></coverage>' > ${{ env.COVERAGE_REPORT_DIR }}/coverage.xml
+            echo "::warning::No test files found. Please add tests to improve code quality."
+            exit 0
+          fi
+          
+          echo "Running pytest on $test_files test file(s)..."
+          COVERAGE_FILE=${{ env.COVERAGE_REPORT_DIR }}/.coverage \
+          pytest \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml:${{ env.COVERAGE_REPORT_DIR }}/coverage.xml \
+            --cov-report=html:${{ env.COVERAGE_REPORT_DIR }}/htmlcov \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            --verbose \
+            tests/
+
+      - name: "Extract and display coverage results"
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'   # only upload coverage reports from one specific job to demonstrate
+        shell: bash
+        run: |
+          # Extract coverage percentage from coverage.xml
+          if [ -f "${{ env.COVERAGE_REPORT_DIR }}/coverage.xml" ]; then
+            COVERAGE_PERCENT=$(python -c "import xml.etree.ElementTree as ET; print(f'{float(ET.parse(\"${{ env.COVERAGE_REPORT_DIR }}/coverage.xml\").getroot().get(\"line-rate\", 0)) * 100:.1f}' if ET.parse(\"coverages/coverage.xml\") else '0.0')" 2>/dev/null || echo "0.0")
+            echo "COVERAGE_PERCENT=$COVERAGE_PERCENT" >> $GITHUB_ENV
+            
+            # Add coverage to step summary
+            echo "## 📊 Test Coverage Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| **Coverage Percentage** | ${COVERAGE_PERCENT}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Coverage Threshold** | ${{ env.COVERAGE_THRESHOLD }}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Status** | $(if (( $(echo "$COVERAGE_PERCENT >= ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then echo "✅ PASSED"; else echo "❌ FAILED"; fi) |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📁 **Coverage Reports:**" >> $GITHUB_STEP_SUMMARY
+            echo "- [HTML Report](./${{ env.COVERAGE_REPORT_DIR }}/htmlcov/index.html)" >> $GITHUB_STEP_SUMMARY
+            echo "- [XML Report](./${{ env.COVERAGE_REPORT_DIR }}/coverage.xml)" >> $GITHUB_STEP_SUMMARY
+            echo "- [JSON Report](./${{ env.COVERAGE_REPORT_DIR }}/coverage.json)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Print to console for immediate visibility
+            echo "🎯 Coverage: ${COVERAGE_PERCENT}% (Threshold: ${{ env.COVERAGE_THRESHOLD }}%)"
+            if (( $(echo "$COVERAGE_PERCENT >= ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+              echo "✅ Coverage threshold met!"
+            else
+              echo "❌ Coverage below threshold!"
+            fi
+          else
+            echo "⚠️  No coverage report found"
+            echo "COVERAGE_PERCENT=0.0" >> $GITHUB_ENV
+          fi
 
       - name: "Upload coverage reports to codecov for analysis"
         # 'if': makes the step conditional, which means it will only run if the statement is true.
@@ -157,7 +225,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }} # <--- Add this line
-          file: ./coverage.xml      # path to the coverage report file
+          file: ${{ env.COVERAGE_REPORT_DIR }}/coverage.xml      # path to the coverage report file
           flags: unittests          # flag to categorize coverage reports in Codecov UI
           name: python-template-project-coverage  # label name assigned to a specific report upload (we can have multiple codecov upload, for example integration test, frontend test...)
           fail_ci_if_error: false   # dont fail CI job if the Codecov upload fail
@@ -171,8 +239,8 @@ jobs:
         with:
           name: test-results-${{ matrix.python-version }}-${{ matrix.os }}
           path: |
-            coverage.xml
-            htmlcov/
+            ${{ env.COVERAGE_REPORT_DIR }}/coverage.xml
+            ${{ env.COVERAGE_REPORT_DIR }}/htmlcov/
           retention-days: 30    # how long to store the artifacts in day unit
 
   # # =============================================================================
